@@ -1,6 +1,6 @@
 import binascii
 
-# --- DES TABLES ---
+# Tables for bytes conversions and DES algorithm
 
 PC1 = [57, 49, 41, 33, 25, 17, 9, 1, 58, 50, 42, 34, 26, 18,
        10, 2, 59, 51, 43, 35, 27, 19, 11, 3, 60, 52, 44, 36,
@@ -42,14 +42,16 @@ IP_INV = [40, 8, 48, 16, 56, 24, 64, 32, 39, 7, 47, 15, 55, 23, 63, 31,
 
 SHIFTS = [1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1]
 
-# --- FUNCTIONS ---
 
+# function to get the left shift of bits for key generation
 def left_shift(bits, n):
     return bits[n:] + bits[:n]
 
+# we XOR a lot in DES 
 def xor(bits1, bits2):
     return "".join('1' if b1 != b2 else '0' for b1, b2 in zip(bits1, bits2))
 
+# 16 key generation --> we use the left shift and PC1/PC2 tables to generate the round keys
 def generate_keys(key_bin):
     permuted_key = "".join(key_bin[i - 1] for i in PC1)
     C, D = permuted_key[:28], permuted_key[28:]
@@ -60,6 +62,8 @@ def generate_keys(key_bin):
         round_keys.append("".join(combined[i - 1] for i in PC2))
     return round_keys
 
+# we use this function to generate the Ln and Rn for each round of DES decryption
+# given that we are trying to decrypt, we will use the round keys in reverse order (K16 -> K1)
 def f_function(R, key):
     # Expansion (32 to 48 bits)
     R_exp = "".join(R[i - 1] for i in E)
@@ -76,19 +80,18 @@ def f_function(R, key):
     # P-Box Permutation
     return "".join(s_out[i - 1] for i in P)
 
+# main function to begin decryption, we will first apply the initial permutation to the ciphertext, then we will perform 16 rounds of DES decryption using the round keys in reverse order, and finally we will apply the inverse initial permutation to get the plaintext
 def decrypt(ciphertext, keys):
     # Initial Permutation
     permuted = "".join(ciphertext[i - 1] for i in IP)
     L, R = permuted[:32], permuted[32:]
     
-    # 16 Rounds (Keys in Reverse order K16 -> K1)
     for i in range(16):
         old_R = R
         f_out = f_function(R, keys[15 - i])
         R = xor(L, f_out)
         L = old_R
-    
-    # Final Swap (R16L16) and Inverse IP
+   
     combined = R + L
     return "".join(combined[i - 1] for i in IP_INV)
 
@@ -96,16 +99,14 @@ def bin_to_text(binary_str):
     n = int(binary_str, 2)
     return n.to_bytes((n.bit_length() + 7) // 8, 'big').decode('ascii')
 
-# --- EXECUTION ---
-
 # From source material
 key_binary = "0100110001001111010101100100010101000011010100110100111001000100"
 ciphertext_bin = "1100101011101101101000100110010101011111101101110011100001110011"
 
-# Step 1: Generate Round Keys
+# Generate Round Keys
 keys = generate_keys(key_binary)
 
-# Step 2: Decrypt
+# Decrypt
 plaintext_bin = decrypt(ciphertext_bin, keys)
 final_message = bin_to_text(plaintext_bin)
 
